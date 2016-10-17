@@ -3,7 +3,7 @@ Option Explicit
 Dim ReportFile, strComputer, objWMIService, colItems, objItem, FS, File, Line
 Dim ComputerName, Motherboard, Processor, Architecture, RAM, HDD, Display, OS
 
-ReportFile  = "C:\InventoryReport.csv"
+ReportFile  = "InventoryReport.csv"
 strComputer = "." 
 
 ' Win32_ComputerSystem
@@ -12,12 +12,21 @@ Set colItems = objWMIService.ExecQuery( _
     "SELECT * FROM Win32_ComputerSystem",,48) 
 For Each objItem in colItems 
     ComputerName = objItem.Name
-    Motherboard = objItem.Manufacturer & " " & objItem.Model
+    'Motherboard = objItem.Manufacturer & " " & objItem.Model
     Architecture = objItem.SystemType
 Next
 ComputerName = """" & ComputerName & """"
-Motherboard = """" & Motherboard & """"
+'Motherboard = """" & Motherboard & """"
 Architecture = """" & Architecture & """"
+
+' Win32_BaseBoard
+Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
+Set colItems = objWMIService.ExecQuery( _
+    "SELECT * FROM Win32_BaseBoard",,48) 
+For Each objItem in colItems
+    Motherboard = objItem.Product
+Next
+Motherboard = """" & Motherboard & """"
 
 ' Win32_Processor
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
@@ -76,7 +85,7 @@ Line = CutSpaces(Line)
 Set FS = CreateObject("Scripting.FileSystemObject")
 If Not FS.FileExists(ReportFile) then
     Set File = FS.CreateTextFile(ReportFile, False)
-    File.Write "Asset Tag,Motherboard,CPU,Memory Value,HDD,Display,OS,Architecture" & vbCrLf
+    File.Write "Asset Tag,Motherboard,Processor,Memory Value,HDD,Display,OS,Architecture" & vbCrLf
 Else
     ' Search for existing string
     Set File = FS.OpenTextFile(ReportFile)
