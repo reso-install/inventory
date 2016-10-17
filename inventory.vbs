@@ -76,7 +76,7 @@ Line = CutSpaces(Line)
 Set FS = CreateObject("Scripting.FileSystemObject")
 If Not FS.FileExists(ReportFile) then
     Set File = FS.CreateTextFile(ReportFile, False)
-    File.Write "ComputerName,Motherboard,CPU,RAM,HDD,Display,OS,Architecture" & vbCrLf
+    File.Write "Asset Tag,Motherboard,CPU,RAM,HDD,Display,OS,Architecture" & vbCrLf
 Else
     ' Search for existing string
     Set File = FS.OpenTextFile(ReportFile)
