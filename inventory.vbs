@@ -33,9 +33,9 @@ Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2")
 Set colItems = objWMIService.ExecQuery( _
     "SELECT * FROM Win32_PhysicalMemory",,48) 
 For Each objItem in colItems 
-    RAM = RAM + Round(objItem.Capacity / (1024*1024*1024), 2)
+    RAM = RAM + Round(objItem.Capacity / (1024*1024), 2)
 Next
-RAM = """" & RAM & "GB"""
+RAM = """" & RAM & """"
 
 ' Win32_LogicalDisk
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
@@ -76,7 +76,7 @@ Line = CutSpaces(Line)
 Set FS = CreateObject("Scripting.FileSystemObject")
 If Not FS.FileExists(ReportFile) then
     Set File = FS.CreateTextFile(ReportFile, False)
-    File.Write "Asset Tag,Motherboard,CPU,RAM,HDD,Display,OS,Architecture" & vbCrLf
+    File.Write "Asset Tag,Motherboard,CPU,Memory Value,HDD,Display,OS,Architecture" & vbCrLf
 Else
     ' Search for existing string
     Set File = FS.OpenTextFile(ReportFile)
