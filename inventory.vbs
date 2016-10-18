@@ -1,7 +1,8 @@
 Option Explicit
 
+Dim WshShell, KeyPath
 Dim ReportFile, strComputer, objWMIService, colItems, objItem, FS, File, Line
-Dim ComputerName, Motherboard, Processor, Architecture, RAM, HDD, Display, OS
+Dim ComputerName, Motherboard, Processor, Architecture, RAMType, RAM, HDDModel, HDDSize, Display, OS, WinKey
 
 ReportFile  = "InventoryReport.csv"
 strComputer = "." 
@@ -42,18 +43,30 @@ Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2")
 Set colItems = objWMIService.ExecQuery( _
     "SELECT * FROM Win32_PhysicalMemory",,48) 
 For Each objItem in colItems 
+	RAMType = objItem.Speed
     RAM = RAM + Round(objItem.Capacity / (1024*1024), 2)
 Next
 RAM = """" & RAM & """"
 
-' Win32_LogicalDisk
+' Win32_DiskDrive
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
 Set colItems = objWMIService.ExecQuery( _
-    "SELECT * FROM Win32_LogicalDisk where DriveType=3",,48) 
+    "SELECT * FROM Win32_DiskDrive where InterfaceType <> 'USB'",,48) 
 For Each objItem in colItems 
-    HDD = HDD + Round(objItem.Size / (1024*1024*1024), 2)
+    HDDModel = HDDModel + objItem.Model + ", "
+	HDDSize = Round(objItem.Size / (1024*1024*1024), 2)
 Next
-HDD = """" & HDD & "GB"""
+HDDModel = """" & HDDModel & """"
+HDDSize = """" & HDDSize & """"
+
+' Win32_LogicalDisk
+'Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
+'Set colItems = objWMIService.ExecQuery( _
+'    "SELECT * FROM Win32_LogicalDisk where DriveType=3",,48) 
+'For Each objItem in colItems 
+'    HDD = HDD + Round(objItem.Size / (1024*1024*1024), 2)
+'Next
+'HDD = """" & HDD & "GB"""
 
 ' Win32_DesktopMonitor
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
@@ -77,7 +90,39 @@ For Each objItem in colItems
 Next
 OS = """" & OS & """"
 
-Line = ComputerName & "," & Motherboard & "," & Processor & "," & RAM & "," & HDD & "," & Display & "," & OS & "," & Architecture
+' Windows Product Key
+Set WshShell = WScript.CreateObject("WScript.Shell")
+
+KeyPath = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\DigitalProductId"
+WinKey = ExtractKey(WshShell.RegRead(KeyPath))
+WinKey = """" & WinKey & """"
+
+Function ExtractKey(KeyInput)
+	Dim i, x, Cur, CharWhitelist, KeyOutput
+    Const KeyOffset = 52
+    i = 28
+    CharWhitelist = "BCDFGHJKMPQRTVWXY2346789"
+    Do
+        Cur = 0
+        x = 14
+        Do
+            Cur = Cur * 256
+            Cur = KeyInput(x + KeyOffset) + Cur
+            KeyInput(x + KeyOffset) = (Cur \ 24) And 255
+            Cur = Cur Mod 24
+            x = x -1
+        Loop While x >= 0
+        i = i -1
+        KeyOutput = Mid(CharWhitelist, Cur + 1, 1) & KeyOutput
+        If (((29 - i) Mod 6) = 0) And (i <> -1) Then
+            i = i -1
+            KeyOutput = "-" & KeyOutput
+        End If
+    Loop While i >= 0
+    ExtractKey = KeyOutput
+End Function
+
+Line = ComputerName & "," & Motherboard & "," & Processor & "," & RAMType & "," & RAM & "," & HDDModel & "," & HDDSize & "," & Display & "," & OS & "," & WinKey
 Line = CutSpaces(Line)
 'Wscript.Echo Line
 
@@ -85,7 +130,7 @@ Line = CutSpaces(Line)
 Set FS = CreateObject("Scripting.FileSystemObject")
 If Not FS.FileExists(ReportFile) then
     Set File = FS.CreateTextFile(ReportFile, False)
-    File.Write "Asset Tag,Motherboard,Processor,Memory Value,HDD,Display,OS,Architecture" & vbCrLf
+    File.Write "Asset Tag,Motherboard,Processor,Memory Type,Memory Value,HD Type,HD Value,Display,OS,Win Key" & vbCrLf
 Else
     ' Search for existing string
     Set File = FS.OpenTextFile(ReportFile)
