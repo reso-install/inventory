@@ -2,10 +2,24 @@ Option Explicit
 
 Dim WshShell, KeyPath
 Dim ReportFile, strComputer, objWMIService, colItems, objItem, FS, File, Line
-Dim ComputerName, Motherboard, Processor, Architecture, RAMType, RAM, HDDModel, HDDSize, Display, OS, WinKey
+Dim ComputerName, Model, Motherboard, Processor, Architecture, RAMType, RAM, HDDModel, HDDSize, Display, OS, WinKey
+Dim Manufacturer, Supplier, Category, ModelName, Status, Location
+Dim oHTML, ExtIP
 
 ReportFile  = "InventoryReport.csv"
 strComputer = "." 
+Model = "Computer"
+Model = """" & Model & """"
+ModelName = Model
+Status = "Agency"
+Status = """" & Status & """"
+
+Set oHTML = CreateObject("MSXML2.XMLhttp")
+oHTML.Open "GET", "http://myexternalip.com/raw", False
+oHTML.Send
+ExtIP =  oHTML.ResponseText
+
+MsgBox(ExtIP)
 
 ' Win32_ComputerSystem
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
@@ -29,14 +43,21 @@ For Each objItem in colItems
 Next
 Motherboard = """" & Motherboard & """"
 
-' Win32_Processor
-Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
-Set colItems = objWMIService.ExecQuery( _
-    "SELECT * FROM Win32_Processor",,48) 
-For Each objItem in colItems 
-    Processor = objItem.Name
-Next
+' Win32_Processor HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString
+
+Set WshShell = WScript.CreateObject("WScript.Shell")
+
+KeyPath = "HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString"
+Processor = WshShell.RegRead(KeyPath)
 Processor = """" & Processor & """"
+
+'Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
+'Set colItems = objWMIService.ExecQuery( _
+'    "SELECT * FROM Win32_Processor",,48) 
+'For Each objItem in colItems 
+'    Processor = objItem.Name
+'Next
+'Processor = """" & Processor & """"
 
 ' Win32_PhysicalMemory
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2") 
@@ -122,7 +143,14 @@ Function ExtractKey(KeyInput)
     ExtractKey = KeyOutput
 End Function
 
-Line = ComputerName & "," & Motherboard & "," & Processor & "," & RAMType & "," & RAM & "," & HDDModel & "," & HDDSize & "," & Display & "," & OS & "," & WinKey
+Manufacturer = """" & "RESO" & """"
+
+Supplier = """" & "RESO" & """"
+
+Category = """" & "Computer technics" & """"
+
+
+Line = ComputerName & "," & Model & "," & Motherboard & "," & Processor & "," & RAMType & "," & RAM & "," & HDDModel & "," & HDDSize & "," & Display & "," & OS & "," & WinKey & "," & Manufacturer & "," & Supplier & "," & Category & "," & ModelName & "," & Status
 Line = CutSpaces(Line)
 'Wscript.Echo Line
 
@@ -130,7 +158,7 @@ Line = CutSpaces(Line)
 Set FS = CreateObject("Scripting.FileSystemObject")
 If Not FS.FileExists(ReportFile) then
     Set File = FS.CreateTextFile(ReportFile, False)
-    File.Write "Asset Tag,Motherboard,Processor,Memory Type,Memory Value,HD Type,HD Value,Display,OS,Win Key" & vbCrLf
+    File.Write "Asset Tag,Model,Motherboard,Processor,Memory Type,Memory Value,HD Type,HD Value,Display,OS,Win Key,Manufacturer,Supplier,Category,Model Name,Status" & vbCrLf
 Else
     ' Search for existing string
     Set File = FS.OpenTextFile(ReportFile)
