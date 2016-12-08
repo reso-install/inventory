@@ -1,10 +1,10 @@
-Option Explicit
+'Option Explicit
 
 Dim WshShell, KeyPath
 Dim ReportFile, strComputer, objWMIService, colItems, objItem, FS, File, Line
 Dim ComputerName, Model, Motherboard, Processor, Architecture, RAMType, RAM, HDDModel, HDDSize, Display, OS, WinKey
 Dim Manufacturer, Supplier, Category, ModelName, Status, Location
-Dim oHTML, ExtIP
+Dim oHTML, ExtIP, DigitalProductId
 
 ReportFile  = "InventoryReport.csv"
 strComputer = "." 
@@ -112,14 +112,20 @@ Next
 OS = """" & OS & """"
 
 ' Windows Product Key
-Set WshShell = WScript.CreateObject("WScript.Shell")
+'Set WshShell = WScript.CreateObject("WScript.Shell")
 
-KeyPath = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\DigitalProductId"
-WinKey = ExtractKey(WshShell.RegRead(KeyPath))
-WinKey = """" & WinKey & """"
+'KeyPath = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\DigitalProductId"
+'WinKey = ConvertToKey(WshShell.RegRead(KeyPath))
+Set WshShell = CreateObject("WScript.Shell")
+KeyPath = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\"
+DigitalProductId = WshShell.RegRead(KeyPath & "DigitalProductId")
+
+Win8ProductKey = ConvertToKey(DigitalProductId)
+
+WinKey = """" & Win8ProductKey & """"
 
 Function ExtractKey(KeyInput)
-	Dim i, x, Cur, CharWhitelist, KeyOutput
+	Dim i, x, Cur, CharWhitelist, KeyOutput, isWin8
     Const KeyOffset = 52
     i = 28
     CharWhitelist = "BCDFGHJKMPQRTVWXY2346789"
@@ -141,6 +147,41 @@ Function ExtractKey(KeyInput)
         End If
     Loop While i >= 0
     ExtractKey = KeyOutput
+End Function
+
+Function ConvertToKey(regKey)
+Dim isWin8, j
+Const KeyOffset = 52
+isWin8 = (regKey(66) \ 6) And 1
+regKey(66) = (regKey(66) And &HF7) Or ((isWin8 And 2) * 4)
+j = 24
+Chars = "BCDFGHJKMPQRTVWXY2346789"
+Do
+Cur = 0
+y = 14
+Do
+Cur = Cur * 256
+Cur = regKey(y + KeyOffset) + Cur
+regKey(y + KeyOffset) = (Cur \ 24)
+Cur = Cur Mod 24
+y = y -1
+Loop While y >= 0
+j = j -1
+winKeyOutput = Mid(Chars, Cur + 1, 1) & winKeyOutput
+Last = Cur
+Loop While j >= 0
+If (isWin8 = 1) Then
+keypart1 = Mid(winKeyOutput, 2, Last)
+insert = "N"
+winKeyOutput = Replace(winKeyOutput, keypart1, keypart1 & insert, 2, 1, 0)
+If Last = 0 Then winKeyOutput = insert & winKeyOutput
+End If
+a = Mid(winKeyOutput, 1, 5)
+b = Mid(winKeyOutput, 6, 5)
+c = Mid(winKeyOutput, 11, 5)
+d = Mid(winKeyOutput, 16, 5)
+e = Mid(winKeyOutput, 21, 5)
+ConvertToKey = a & "-" & b & "-" & c & "-" & d & "-" & e
 End Function
 
 Manufacturer = """" & "RESO" & """"
