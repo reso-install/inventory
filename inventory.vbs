@@ -15,7 +15,7 @@ Status = "Agency"
 Status = """" & Status & """"
 
 Set oHTML = CreateObject("MSXML2.XMLhttp")
-oHTML.Open "GET", "http://myexternalip.com/raw", False
+oHTML.Open "GET", "https://api.ipify.org/", False
 oHTML.Send
 ExtIP =  oHTML.ResponseText
 
