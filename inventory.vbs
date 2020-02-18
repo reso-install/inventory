@@ -6,15 +6,19 @@ Dim ComputerName, Model, Motherboard, Processor, Architecture, RAMType, RAM, HDD
 Dim Manufacturer, Supplier, Category, ModelName, Status, Location
 Dim oHTML, ExtIP, DigitalProductId
 
+' Varialbles for API
+Dim name_api, motherboard_api, processor_api, memory_type_api, memory_value_api, hd_type_api, hd_value_api, win_key_api
+
 ReportFile  = "InventoryReport.csv"
 strComputer = "."
 Status = "Agency"
 Status = """" & Status & """"
 
-Set oHTML = CreateObject("MSXML2.XMLhttp")
-oHTML.Open "GET", "https://api.ipify.org/", False
-oHTML.Send
-ExtIP = """" & oHTML.ResponseText & """"
+'Set oHTML = CreateObject("MSXML2.XMLHTTP")
+'oHTML.open "GET", "http://api.ipify.org/", False
+'oHTML.send
+'ExtIP = """" & oHTML.ResponseText & """"
+ExtIP = ""
 
 ' Win32_ComputerSystem
 Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2")
@@ -23,6 +27,7 @@ For Each objItem in colItems
     ComputerName = objItem.Name
     Architecture = objItem.SystemType
 Next
+name_api = ComputerName
 ComputerName = """" & ComputerName & """"
 Architecture = """" & Architecture & """"
 
@@ -32,6 +37,7 @@ Set colItems = objWMIService.ExecQuery("SELECT * FROM Win32_BaseBoard",,48)
 For Each objItem in colItems
     Motherboard = objItem.Product
 Next
+motherboard_api = Motherboard
 Motherboard = """" & Motherboard & """"
 
 ' Win32_Processor HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString
@@ -40,6 +46,7 @@ Set WshShell = WScript.CreateObject("WScript.Shell")
 
 KeyPath = "HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString"
 Processor = WshShell.RegRead(KeyPath)
+processor_api = Processor
 Processor = """" & Processor & """"
 
 'Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\CIMV2")
@@ -57,6 +64,8 @@ For Each objItem in colItems
     RAMType = RAMType + CStr(objItem.Speed) + ", "
     RAM = RAM + CStr(Round(objItem.Capacity / (1024*1024), 2)) + ", "
 Next
+memory_type_api = RAMType
+memory_value_api = RAM
 RAMType = """" & RAMType & """"
 RAM = """" & RAM & """"
 
@@ -67,6 +76,8 @@ For Each objItem in colItems
     HDDModel = HDDModel + objItem.Model + ", "
     HDDSize = HDDSize + CStr(Round(objItem.Size / (1024*1024*1024), 2)) + ", "
 Next
+hd_type_api = HDDModel
+hd_value_api = HDDSize
 HDDModel = """" & HDDModel & """"
 HDDSize = """" & HDDSize & """"
 
@@ -110,6 +121,7 @@ DigitalProductId = WshShell.RegRead(KeyPath & "DigitalProductId")
 
 Win8ProductKey = ConvertToKey(DigitalProductId)
 
+win_key_api = Win8ProductKey
 WinKey = """" & Win8ProductKey & """"
 
 Line = ComputerName & "," & Motherboard & "," & Processor & "," & RAMType & "," & RAM & "," & HDDModel & "," & HDDSize & "," & Display & "," & OS & "," & WinKey & "," & ExtIP
@@ -140,7 +152,13 @@ End If
 ' Write to file
 File.Write Line & vbCrLf
 File.Close
-MsgBox("Inventory Complete")
+
+' Send data to API
+Set oHTML = CreateObject("MSXML2.XMLHTTP")
+oHTML.open "GET", ReadIni("config.ini", "api", "url") & "?name=" & name_api & "&motherboard=" & motherboard_api & "&processor=" & processor_api & "&memory_type=" & memory_type_api & "&memory_value=" & memory_value_api & "&hd_type=" & hd_type_api & "&hd_value=" & hd_value_api & "&win_key=" & win_key_api, False
+oHTML.send
+
+MsgBox("Inventory Complete for key = " & win_key_api)
 WScript.Quit 0
 
 ' Functions section
@@ -217,4 +235,78 @@ Function CutSpaces (Input)
     objRegEx.Global = True
     objRegEx.Pattern = "\s+|\t+/ig"
     CutSpaces = objRegEx.Replace(Input, " ")
+End Function
+
+Function ReadIni( myFilePath, mySection, myKey )
+    ' This function returns a value read from an INI file
+    '
+    ' Arguments:
+    ' myFilePath  [string]  the (path and) file name of the INI file
+    ' mySection   [string]  the section in the INI file to be searched
+    ' myKey       [string]  the key whose value is to be returned
+    '
+    ' Returns:
+    ' the [string] value for the specified key in the specified section
+    '
+    ' CAVEAT:     Will return a space if key exists but value is blank
+    '
+    ' Written by Keith Lacelle
+    ' Modified by Denis St-Pierre and Rob van der Woude
+
+    Const ForReading   = 1
+    Const ForWriting   = 2
+    Const ForAppending = 8
+
+    Dim intEqualPos
+    Dim objFSO, objIniFile
+    Dim strFilePath, strKey, strLeftString, strLine, strSection
+
+    Set objFSO = CreateObject( "Scripting.FileSystemObject" )
+
+    ReadIni     = ""
+    strFilePath = Trim( myFilePath )
+    strSection  = Trim( mySection )
+    strKey      = Trim( myKey )
+
+    If objFSO.FileExists( strFilePath ) Then
+        Set objIniFile = objFSO.OpenTextFile( strFilePath, ForReading, False )
+        Do While objIniFile.AtEndOfStream = False
+            strLine = Trim( objIniFile.ReadLine )
+
+            ' Check if section is found in the current line
+            If LCase( strLine ) = "[" & LCase( strSection ) & "]" Then
+                strLine = Trim( objIniFile.ReadLine )
+
+                ' Parse lines until the next section is reached
+                Do While Left( strLine, 1 ) <> "["
+                    ' Find position of equal sign in the line
+                    intEqualPos = InStr( 1, strLine, "=", 1 )
+                    If intEqualPos > 0 Then
+                        strLeftString = Trim( Left( strLine, intEqualPos - 1 ) )
+                        ' Check if item is found in the current line
+                        If LCase( strLeftString ) = LCase( strKey ) Then
+                            ReadIni = Trim( Mid( strLine, intEqualPos + 1 ) )
+                            ' In case the item exists but value is blank
+                            If ReadIni = "" Then
+                                ReadIni = " "
+                            End If
+                            ' Abort loop when item is found
+                            Exit Do
+                        End If
+                    End If
+
+                    ' Abort if the end of the INI file is reached
+                    If objIniFile.AtEndOfStream Then Exit Do
+
+                    ' Continue with next line
+                    strLine = Trim( objIniFile.ReadLine )
+                Loop
+            Exit Do
+            End If
+        Loop
+        objIniFile.Close
+    Else
+        WScript.Echo strFilePath & " doesn't exists. Exiting..."
+        Wscript.Quit 1
+    End If
 End Function
